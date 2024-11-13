@@ -45,6 +45,7 @@ ggg() {
     fi
 
     local COMMIT_MESSAGE="$1"
+    local ORIGINAL_DIR=$(pwd)  # 保存执行 ggg 时的目录
 
     # Function to process a repository and its submodules
     process_repo() {
@@ -54,10 +55,9 @@ ggg() {
 
         echo_start "$indent" "Processing repository: $repo_name"
 
-        # Save current directory to return later
         pushd "$repo_path" > /dev/null || return
 
-        # Loop through submodules
+        # Store submodules in array
         local oldIFS=$IFS
         IFS=$'\n'
         local submodules=($(git submodule foreach --quiet 'echo "$path"'))
@@ -66,12 +66,10 @@ ggg() {
         for submodule in "${submodules[@]}"; do
             if [ ! -z "$submodule" ]; then
                 process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
-                # Explicitly return to parent repo after processing each submodule
                 pushd "$repo_path" > /dev/null || return
             fi
         done
 
-        # Check if there are any changes in the current repo
         if [[ $(git status --porcelain) ]]; then
             echo_step "$indent" "Changes detected in $repo_name. Committing..."
             git add .
@@ -84,14 +82,15 @@ ggg() {
             #echo_info "$indent" "No changes detected in $repo_name"
         fi
 
-        # Return to the parent directory
         popd > /dev/null || return
     }
 
     echo -e "${CYAN}=== Starting Git Global Commit (ggg) ===${RESET}"
     # Start the process from the current directory
-    process_repo "." "$(basename "$(pwd)")" ""
+    process_repo "$ORIGINAL_DIR" "$(basename "$ORIGINAL_DIR")" ""
+    # 确保返回到执行 ggg 时的目录
+    cd "$ORIGINAL_DIR"
     echo -e "${CYAN}=== Git Global Commit (ggg) Complete ===${RESET}"
 }
 
-export -f ggg
+export ggg
