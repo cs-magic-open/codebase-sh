@@ -36,9 +36,7 @@ echo_error() {
     echo -e "${1}${ERROR_INDICATOR} ${RED}Error:${RESET} $2"
 }
 
-
-export ggg() {
-
+ggg() {
     # Check if a commit message was provided
     if [ $# -eq 0 ]; then
         echo_error "" "Please provide a commit message."
@@ -59,10 +57,15 @@ export ggg() {
         # Save current directory to return later
         pushd "$repo_path" > /dev/null || return
 
-        # Process all submodules first
-        git submodule foreach --quiet 'echo "$path"' | while read -r submodule; do
-            process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
-        done
+        # Store the output of git submodule in a variable
+        local submodules=$(git submodule foreach --quiet 'echo "$path"')
+        
+        # Process each submodule
+        if [ ! -z "$submodules" ]; then
+            echo "$submodules" | while read -r submodule; do
+                process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
+            done
+        fi
 
         # After processing all submodules, check if there are any changes in the current repo
         if [[ $(git status --porcelain) ]]; then
@@ -79,7 +82,6 @@ export ggg() {
 
         # Return to the parent directory
         popd > /dev/null || return
-
     }
 
     echo -e "${CYAN}=== Starting Git Global Commit (ggg) ===${RESET}"
@@ -88,5 +90,4 @@ export ggg() {
     echo -e "${CYAN}=== Git Global Commit (ggg) Complete ===${RESET}"
 }
 
-# Example usage (commented out)
-# ggg "Your commit message here"
+export -f ggg
