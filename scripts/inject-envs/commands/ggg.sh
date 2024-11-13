@@ -57,17 +57,21 @@ ggg() {
         # Save current directory to return later
         pushd "$repo_path" > /dev/null || return
 
-        # Store the output of git submodule in a variable
-        local submodules=$(git submodule foreach --quiet 'echo "$path"')
-        
-        # Process each submodule
-        if [ ! -z "$submodules" ]; then
-            echo "$submodules" | while read -r submodule; do
-                process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
-            done
-        fi
+        # Loop through submodules
+        local oldIFS=$IFS
+        IFS=$'\n'
+        local submodules=($(git submodule foreach --quiet 'echo "$path"'))
+        IFS=$oldIFS
 
-        # After processing all submodules, check if there are any changes in the current repo
+        for submodule in "${submodules[@]}"; do
+            if [ ! -z "$submodule" ]; then
+                process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
+                # Explicitly return to parent repo after processing each submodule
+                pushd "$repo_path" > /dev/null || return
+            fi
+        done
+
+        # Check if there are any changes in the current repo
         if [[ $(git status --porcelain) ]]; then
             echo_step "$indent" "Changes detected in $repo_name. Committing..."
             git add .
