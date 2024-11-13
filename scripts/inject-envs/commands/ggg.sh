@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # ANSI color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,7 +17,7 @@ END_INDICATOR="${GREEN}✔${RESET}"
 ERROR_INDICATOR="${RED}✘${RESET}"
 
 echo_start() {
-    echo -e "${1}${START_INDICATOR} ${BLUE}Starting:${RESET} $2"
+    echo -e "\n${1}${START_INDICATOR} ${BLUE}Starting:${RESET} $2"
 }
 
 echo_step() {
@@ -35,7 +36,9 @@ echo_error() {
     echo -e "${1}${ERROR_INDICATOR} ${RED}Error:${RESET} $2"
 }
 
+
 export ggg() {
+
     # Check if a commit message was provided
     if [ $# -eq 0 ]; then
         echo_error "" "Please provide a commit message."
@@ -50,19 +53,17 @@ export ggg() {
         local repo_path="$1"
         local repo_name="$2"
         local indent="$3"
-        
+
         echo_start "$indent" "Processing repository: $repo_name"
-        
+
         # Save current directory to return later
         pushd "$repo_path" > /dev/null || return
-        
-        # Process all submodules using while read to maintain directory stack
-        while read -r submodule; do
-            if [ ! -z "$submodule" ]; then
-                process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
-            fi
-        done < <(git submodule foreach --quiet 'echo "$path"')
-        
+
+        # Process all submodules first
+        git submodule foreach --quiet 'echo "$path"' | while read -r submodule; do
+            process_repo "$submodule" "$submodule" "$indent$INDENT_CHAR"
+        done
+
         # After processing all submodules, check if there are any changes in the current repo
         if [[ $(git status --porcelain) ]]; then
             echo_step "$indent" "Changes detected in $repo_name. Committing..."
@@ -75,16 +76,15 @@ export ggg() {
             :
             #echo_info "$indent" "No changes detected in $repo_name"
         fi
-        
+
         # Return to the parent directory
         popd > /dev/null || return
+
     }
 
     echo -e "${CYAN}=== Starting Git Global Commit (ggg) ===${RESET}"
-    
     # Start the process from the current directory
     process_repo "." "$(basename "$(pwd)")" ""
-    
     echo -e "${CYAN}=== Git Global Commit (ggg) Complete ===${RESET}"
 }
 

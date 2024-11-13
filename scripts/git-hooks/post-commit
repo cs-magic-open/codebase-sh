@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Path to this hook: .git/modules/[submodule-name]/hooks/post-commit
+# Make sure to make this file executable: chmod +x post-commit
+
+# Get the current submodule's absolute path
+SUBMODULE_PATH=$(git rev-parse --show-toplevel)
+SUBMODULE_NAME=$(basename "$SUBMODULE_PATH")
+
+# Function to find the parent git repository
+find_parent_repo() {
+    local current_path="$1"
+    local previous_path=""
+    
+    while [[ "$current_path" != "/" && "$current_path" != "$previous_path" ]]; do
+        previous_path="$current_path"
+        current_path="$(dirname "$current_path")"
+        
+        if [[ -f "$current_path/.gitmodules" ]]; then
+            if grep -q "$SUBMODULE_NAME" "$current_path/.gitmodules"; then
+                echo "$current_path"
+                return 0
+            fi
+        fi
+    done
+    
+    return 1
+}
+
+# Find the parent repository
+PARENT_REPO=$(find_parent_repo "$SUBMODULE_PATH")
+
+if [[ -z "$PARENT_REPO" ]]; then
+    echo "Error: Could not find parent repository containing this submodule"
+    exit 1
+fi
+
+# Navigate to parent repository
+cd "$PARENT_REPO"
+
+# Get the relative path of the submodule from the parent
+RELATIVE_PATH=$(git config -f .gitmodules --get-regexp path | grep "$SUBMODULE_NAME" | awk '{print $2}')
+
+if [[ -z "$RELATIVE_PATH" ]]; then
+    echo "Error: Could not determine relative path for submodule"
+    exit 1
+fi
+
+# Get the current branch name
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Stage the submodule changes using the correct relative path
+git add "$RELATIVE_PATH"
+
+# Check if there are changes to commit
+if ! git diff --staged --quiet; then
+    # Create commit message
+    COMMIT_MSG="Auto-commit: Update submodule '$RELATIVE_PATH'"
+
+    # Commit the changes
+    git commit -m "$COMMIT_MSG"
+    echo "Successfully committed submodule changes to parent repository at $PARENT_REPO"
+else
+    echo "No changes to commit in parent repository"
+fi
+
+# Optional: Push changes to remote
+# Uncomment the next line if you want automatic pushing
+# git push origin "$BRANCH"
